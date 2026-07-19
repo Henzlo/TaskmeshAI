@@ -8,6 +8,8 @@ import lombok.Builder;
 import lombok.Data;
 import lombok.NoArgsConstructor;
 
+import java.util.Map;
+
 @Data
 @Builder
 @NoArgsConstructor
@@ -18,4 +20,6 @@ public class AnalysisReport {
     private ExtractedFacts facts;
     private ApplicableLaw laws;
     private RiskAnalysis riskAnalysis;
+    private Map<String, Long> agentTimings;
+    private Long totalProcessingTimeMs;
 }

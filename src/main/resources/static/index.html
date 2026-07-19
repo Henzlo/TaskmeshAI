@@ -1,0 +1,192 @@
+<!DOCTYPE html>
+<html lang="en">
+<head>
+  <meta charset="UTF-8">
+  <meta name="viewport" content="width=device-width, initial-scale=1.0">
+  <title>TaskMesh AI — Multi-Agent Legal Analyzer</title>
+  <link rel="stylesheet" href="styles.css">
+</head>
+<body>
+  <div class="app-shell">
+    <!-- SIDEBAR -->
+    <aside id="sidebar" class="sidebar">
+      <div class="logo-area">
+        <h1 class="logo">⚖️ TaskMesh AI</h1>
+        <p class="logo-subtitle">Multi-Agent Legal Analyzer</p>
+      </div>
+
+      <button type="button" id="new-case-btn" class="btn btn-primary btn-block">+ New Analysis</button>
+
+      <h2 class="sidebar-heading">Case History</h2>
+      <div id="case-list" class="case-list" aria-live="polite"></div>
+    </aside>
+
+    <!-- MAIN AREA -->
+    <main id="main-area" class="main-area">
+
+      <!-- VIEW A: Upload -->
+      <section id="upload-view" class="view">
+        <header class="view-header">
+          <h2 class="view-title">Analyze a Legal Contract</h2>
+          <p class="view-subtext">Three specialized AI agents will extract facts, identify applicable laws, and assess risks</p>
+        </header>
+
+        <div class="agent-pipeline" aria-label="Agent pipeline">
+          <div class="pipeline-card card">
+            <span class="pipeline-icon">🔍</span>
+            <strong>Facts Agent</strong>
+            <span class="pipeline-desc">Extracts parties, timeline &amp; clauses</span>
+          </div>
+          <span class="pipeline-arrow" aria-hidden="true">→</span>
+          <div class="pipeline-card card">
+            <span class="pipeline-icon">⚖️</span>
+            <strong>Law Agent</strong>
+            <span class="pipeline-desc">Identifies acts &amp; regulatory approvals</span>
+          </div>
+          <span class="pipeline-arrow" aria-hidden="true">→</span>
+          <div class="pipeline-card card">
+            <span class="pipeline-icon">🚨</span>
+            <strong>Risk Agent</strong>
+            <span class="pipeline-desc">Scores risk &amp; suggests mitigations</span>
+          </div>
+        </div>
+
+        <form id="upload-form" class="upload-form" autocomplete="off">
+          <div class="form-group">
+            <label for="case-title">Case Title</label>
+            <input type="text" id="case-title" class="form-input" placeholder="e.g. TechCorp M&amp;A Review" required>
+          </div>
+
+          <div class="form-group">
+            <label for="doc-type">Document Type</label>
+            <select id="doc-type" class="form-select" required>
+              <option value="MERGER_AGREEMENT">MERGER_AGREEMENT</option>
+              <option value="ACQUISITION">ACQUISITION</option>
+              <option value="LEASE">LEASE</option>
+              <option value="EMPLOYMENT">EMPLOYMENT</option>
+              <option value="NDA">NDA</option>
+              <option value="IP_LICENSE">IP_LICENSE</option>
+              <option value="JOINT_VENTURE">JOINT_VENTURE</option>
+              <option value="OTHER">OTHER</option>
+            </select>
+          </div>
+
+          <div class="form-group">
+            <label for="contract-text">Contract Text</label>
+            <textarea id="contract-text" class="form-textarea" rows="12" placeholder="Paste the full contract text here…" required></textarea>
+          </div>
+
+          <div class="form-actions">
+            <button type="button" id="sample-btn" class="btn btn-secondary">Load Sample Contract</button>
+            <button type="submit" id="analyze-btn" class="btn btn-primary">▶ Run Analysis</button>
+          </div>
+        </form>
+      </section>
+
+      <!-- VIEW B: Loading -->
+      <section id="loading-view" class="view view-hidden" hidden>
+        <div class="loading-content">
+          <div class="spinner" aria-hidden="true"></div>
+          <h2 class="view-title">Running Multi-Agent Analysis</h2>
+
+          <div class="analysis-steps">
+            <div id="step-facts" class="step-row step-pending">
+              <span class="step-icon">🔍</span>
+              <div class="step-body">
+                <strong class="step-name">Facts Agent</strong>
+                <span class="step-status">Pending</span>
+              </div>
+            </div>
+            <div id="step-law" class="step-row step-pending">
+              <span class="step-icon">⚖️</span>
+              <div class="step-body">
+                <strong class="step-name">Law Agent</strong>
+                <span class="step-status">Pending</span>
+              </div>
+            </div>
+            <div id="step-risk" class="step-row step-pending">
+              <span class="step-icon">🚨</span>
+              <div class="step-body">
+                <strong class="step-name">Risk Agent</strong>
+                <span class="step-status">Pending</span>
+              </div>
+            </div>
+          </div>
+
+          <p class="loading-note">Powered by Llama 3.3 70B via Groq</p>
+        </div>
+      </section>
+
+      <!-- VIEW C: Report -->
+      <section id="report-view" class="view view-hidden" hidden>
+        <div class="report-topbar">
+          <h2 id="report-title" class="view-title">Analysis Report</h2>
+          <button type="button" id="report-new-btn" class="btn btn-secondary">New Analysis</button>
+        </div>
+
+        <div class="hero-row">
+          <div id="risk-gauge" class="risk-gauge" aria-label="Risk score gauge">
+            <svg class="gauge-svg" viewBox="0 0 120 120" aria-hidden="true">
+              <circle class="gauge-track" cx="60" cy="60" r="52"></circle>
+              <circle id="gauge-fill" class="gauge-fill" cx="60" cy="60" r="52"></circle>
+            </svg>
+            <div class="gauge-center">
+              <span id="gauge-score" class="gauge-score">—</span>
+              <span class="gauge-label">Score</span>
+            </div>
+          </div>
+          <div class="hero-meta">
+            <span id="risk-level" class="badge badge-risk">—</span>
+            <p id="total-time" class="total-time">Total: —</p>
+          </div>
+        </div>
+
+        <div id="timing-chips" class="timing-chips"></div>
+
+        <div class="cards-grid">
+          <article id="parties-card" class="card report-card">
+            <h3 class="section-title">Parties</h3>
+            <div class="card-body"></div>
+          </article>
+          <article id="financial-card" class="card report-card">
+            <h3 class="section-title">Financial Terms</h3>
+            <div class="card-body"></div>
+          </article>
+          <article id="missing-card" class="card report-card">
+            <h3 class="section-title">Missing Clauses</h3>
+            <div class="card-body"></div>
+          </article>
+        </div>
+
+        <section class="report-section">
+          <h3 class="section-title">Applicable Laws</h3>
+          <div id="laws-table" class="table-container"></div>
+        </section>
+
+        <section class="report-section">
+          <h3 class="section-title">Regulatory Approvals</h3>
+          <div id="approvals-list"></div>
+        </section>
+
+        <section class="report-section">
+          <h3 class="section-title">Risk Breakdown</h3>
+          <div id="risk-categories"></div>
+        </section>
+
+        <section class="report-section">
+          <h3 class="section-title">Top Risks</h3>
+          <div id="top-risks"></div>
+        </section>
+
+        <section class="report-section">
+          <h3 class="section-title">Mitigation Strategies</h3>
+          <div id="mitigation-list"></div>
+        </section>
+      </section>
+
+    </main>
+  </div>
+
+  <script src="app.js"></script>
+</body>
+</html>
