@@ -1,6 +1,8 @@
 # Local secrets — never commit
 **/application-local.yml
 src/main/resources/application-local.yml
+**/application.yml
+src/main/resources/application.yml
 
 # Build
 target/
