@@ -168,21 +168,56 @@ Intentionally omitted: indemnity, force majeure, and dispute resolution clauses.
     setStep(els.stepFacts, "pending");
     setStep(els.stepLaw, "pending");
     setStep(els.stepRisk, "pending");
-    setStep(els.stepFacts, "active");
+  }
 
-    stepTimers.push(
-      setTimeout(() => {
-        setStep(els.stepFacts, "done");
-        setStep(els.stepLaw, "active");
-      }, 7000)
-    );
+  function applyStatusToSteps(status) {
+    const s = String(status || "").toUpperCase();
+    if (s === "EXTRACTING" || s === "CREATED" || s === "STARTED") {
+      setStep(els.stepFacts, "active");
+      setStep(els.stepLaw, "pending");
+      setStep(els.stepRisk, "pending");
+      return;
+    }
+    if (s === "ANALYZING") {
+      setStep(els.stepFacts, "done");
+      setStep(els.stepLaw, "active");
+      setStep(els.stepRisk, "pending");
+      return;
+    }
+    if (s === "REVIEWING") {
+      setStep(els.stepFacts, "done");
+      setStep(els.stepLaw, "done");
+      setStep(els.stepRisk, "active");
+      return;
+    }
+    if (s === "COMPLETED") {
+      markAllStepsDone();
+    }
+  }
 
-    stepTimers.push(
-      setTimeout(() => {
-        setStep(els.stepLaw, "done");
-        setStep(els.stepRisk, "active");
-      }, 14000)
-    );
+  function sleep(ms) {
+    return new Promise((resolve) => setTimeout(resolve, ms));
+  }
+
+  async function pollAnalysisStatus(caseId) {
+    const maxAttempts = 120;
+    for (let i = 0; i < maxAttempts; i++) {
+      const res = await fetch(`/api/cases/${encodeURIComponent(caseId)}/status`);
+      if (!res.ok) {
+        const errBody = await res.json().catch(() => ({}));
+        throw new Error(errBody.message || `Status poll failed (${res.status})`);
+      }
+      const data = await res.json();
+      applyStatusToSteps(data.status);
+
+      if (data.status === "COMPLETED") return data;
+      if (data.status === "FAILED") {
+        throw new Error("Analysis failed");
+      }
+
+      await sleep(2000);
+    }
+    throw new Error("Analysis timed out while waiting for agents");
   }
 
   function markAllStepsDone() {
@@ -308,6 +343,7 @@ Intentionally omitted: indemnity, force majeure, and dispute resolution clauses.
     if (els.analyzeBtn) els.analyzeBtn.disabled = true;
     showView("loading");
     startStepAnimation();
+    applyStatusToSteps("EXTRACTING");
 
     try {
       const createRes = await fetch("/api/cases", {
@@ -335,12 +371,21 @@ Intentionally omitted: indemnity, force majeure, and dispute resolution clauses.
         throw new Error(errBody.message || `Analysis failed (${analyzeRes.status})`);
       }
 
-      const report = await analyzeRes.json();
+      await pollAnalysisStatus(caseId);
+
+      const reportRes = await fetch(
+        `/api/cases/${encodeURIComponent(caseId)}/report`
+      );
+      if (!reportRes.ok) {
+        const errBody = await reportRes.json().catch(() => ({}));
+        throw new Error(errBody.message || `Report fetch failed (${reportRes.status})`);
+      }
+      const report = await reportRes.json();
 
       clearTimers();
       markAllStepsDone();
 
-      await new Promise((resolve) => setTimeout(resolve, 400));
+      await sleep(400);
 
       renderReport(report, title || created.title || "Analysis Report");
       showView("report");

@@ -1,6 +1,5 @@
 package com.taskmesh.service;
 
-import com.taskmesh.dto.AnalysisReport;
 import com.taskmesh.dto.CreateCaseRequest;
 import com.taskmesh.dto.CaseResponse;
 import com.taskmesh.dto.ReportResponse;
@@ -14,16 +13,13 @@ import com.taskmesh.shared.SharedMemoryStore;
 import lombok.RequiredArgsConstructor;
 import lombok.extern.slf4j.Slf4j;
 import org.springframework.stereotype.Service;
-import org.springframework.transaction.PlatformTransactionManager;
-import org.springframework.transaction.TransactionDefinition;
 import org.springframework.transaction.annotation.Transactional;
-import org.springframework.transaction.support.TransactionTemplate;
 
-import java.time.LocalDateTime;
 import java.util.Comparator;
-import java.util.HashMap;
+import java.util.LinkedHashMap;
 import java.util.List;
 import java.util.Map;
+import java.util.Set;
 import java.util.stream.Collectors;
 
 @Service
@@ -31,12 +27,15 @@ import java.util.stream.Collectors;
 @Slf4j
 public class CaseService {
 
+    private static final Set<CaseStatus> IN_PROGRESS = Set.of(
+        CaseStatus.EXTRACTING,
+        CaseStatus.ANALYZING,
+        CaseStatus.REVIEWING
+    );
+
     private final CaseRepository caseRepository;
-    private final FactsAgentService factsAgent;
-    private final LawAgentService lawAgent;
-    private final RiskAgentService riskAgent;
+    private final AnalysisPipelineService analysisPipelineService;
     private final SharedMemoryStore sharedMemory;
-    private final PlatformTransactionManager transactionManager;
 
     @Transactional
     public CaseResponse createCase(CreateCaseRequest request) {
@@ -70,83 +69,38 @@ public class CaseService {
             .collect(Collectors.toList());
     }
 
-    @Transactional
-    public AnalysisReport analyzeCase(String caseId) {
+    public void startAnalysis(String caseId) {
         Case caseEntity = caseRepository.findById(caseId)
             .orElseThrow(() -> new RuntimeException("Case not found: " + caseId));
 
-        try {
-            String documentText = caseEntity.getDocumentText();
-            Map<String, Long> agentTimings = new HashMap<>();
-
-            // Step 1: Extract Facts
-            log.info("ANALYSIS STARTED | caseId={} | Step 1: EXTRACTING", caseId);
-            caseEntity.setStatus(CaseStatus.EXTRACTING);
-            caseRepository.save(caseEntity);
-
-            long factsStart = System.currentTimeMillis();
-            ExtractedFacts facts = factsAgent.extractFacts(documentText);
-            agentTimings.put("factsAgentMs", System.currentTimeMillis() - factsStart);
-            sharedMemory.put(caseId, "facts", facts);
-            log.info("FACTS STORED | caseId={}", caseId);
-
-            // Step 2: Analyze Laws
-            log.info("Step 2: ANALYZING | caseId={}", caseId);
-            caseEntity.setStatus(CaseStatus.ANALYZING);
-            caseRepository.save(caseEntity);
-
-            long lawStart = System.currentTimeMillis();
-            ApplicableLaw laws = lawAgent.analyzeLaws(facts);
-            agentTimings.put("lawAgentMs", System.currentTimeMillis() - lawStart);
-            sharedMemory.put(caseId, "laws", laws);
-            log.info("LAWS STORED | caseId={}", caseId);
-
-            // Step 3: Assess Risk
-            log.info("Step 3: REVIEWING | caseId={}", caseId);
-            caseEntity.setStatus(CaseStatus.REVIEWING);
-            caseRepository.save(caseEntity);
-
-            long riskStart = System.currentTimeMillis();
-            RiskAnalysis risk = riskAgent.assessRisk(facts, laws);
-            agentTimings.put("riskAgentMs", System.currentTimeMillis() - riskStart);
-            sharedMemory.put(caseId, "risk", risk);
-            log.info("RISK STORED | caseId={}", caseId);
-
-            long totalProcessingTimeMs = agentTimings.values().stream().mapToLong(Long::longValue).sum();
-            sharedMemory.put(caseId, "timings", agentTimings);
-
-            // Complete
-            caseEntity.setStatus(CaseStatus.COMPLETED);
-            caseEntity.setCompletedAt(LocalDateTime.now());
-            caseRepository.save(caseEntity);
-
-            log.info("ANALYSIS COMPLETED | caseId={} | duration={}", caseId,
-                java.time.Duration.between(caseEntity.getCreatedAt(), caseEntity.getCompletedAt()).getSeconds());
-
-            return AnalysisReport.builder()
-                .caseId(caseId)
-                .facts(facts)
-                .laws(laws)
-                .riskAnalysis(risk)
-                .agentTimings(agentTimings)
-                .totalProcessingTimeMs(totalProcessingTimeMs)
-                .build();
-        } catch (Exception e) {
-            log.error("ANALYSIS FAILED | caseId={} | error={}", caseId, e.getMessage(), e);
-            markCaseFailed(caseId);
-            throw new RuntimeException("Analysis failed: " + e.getMessage(), e);
+        if (IN_PROGRESS.contains(caseEntity.getStatus())) {
+            throw new RuntimeException("Analysis already in progress");
         }
+
+        log.info("ANALYSIS QUEUED | caseId={}", caseId);
+        analysisPipelineService.runAnalysisPipeline(caseId);
     }
 
-    private void markCaseFailed(String caseId) {
-        TransactionTemplate tx = new TransactionTemplate(transactionManager);
-        tx.setPropagationBehavior(TransactionDefinition.PROPAGATION_REQUIRES_NEW);
-        tx.executeWithoutResult(status -> {
-            caseRepository.findById(caseId).ifPresent(failedCase -> {
-                failedCase.setStatus(CaseStatus.FAILED);
-                caseRepository.save(failedCase);
-            });
-        });
+    public Map<String, String> getCaseStatus(String caseId) {
+        Case caseEntity = caseRepository.findById(caseId)
+            .orElseThrow(() -> new RuntimeException("Case not found: " + caseId));
+
+        Map<String, String> body = new LinkedHashMap<>();
+        body.put("caseId", caseEntity.getId());
+        body.put("status", caseEntity.getStatus().name());
+        body.put("currentStep", mapCurrentStep(caseEntity.getStatus()));
+        return body;
+    }
+
+    private String mapCurrentStep(CaseStatus status) {
+        return switch (status) {
+            case CREATED -> "Waiting";
+            case EXTRACTING -> "Facts Agent running";
+            case ANALYZING -> "Law Agent running";
+            case REVIEWING -> "Risk Agent running";
+            case COMPLETED -> "Done";
+            case FAILED -> "Failed";
+        };
     }
 
     public CaseResponse getCase(String caseId) {
