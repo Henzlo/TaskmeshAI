@@ -1,0 +1,43 @@
+MERGER AGREEMENT
+
+This Merger Agreement ("Agreement") is entered into as of January 15, 2026, by and between:
+
+PARTY A: TechCorp Inc., a Delaware corporation ("Acquirer")
+PARTY B: InnovateSoft Ltd., an Indian private limited company ("Target")
+
+1. TRANSACTION
+   Acquirer agrees to acquire 100% of Target's outstanding shares for a total purchase price of $500,000,000 USD.
+
+2. PURCHASE PRICE
+   The total purchase price shall be $500,000,000 USD, payable at closing. 
+   An additional earnout of $50,000,000 shall be payable if Target achieves $100,000,000 in revenue for fiscal year 2027.
+
+3. CLOSING
+   The closing of this transaction shall occur on June 30, 2026, subject to customary closing conditions.
+
+4. GOVERNING LAW
+   This Agreement shall be governed by the laws of the State of Delaware, without regard to conflict of law principles.
+
+5. TERMINATION
+   Either party may terminate this Agreement under certain conditions. 
+   Notice of termination must be provided at least 15 days prior to the effective date of termination.
+
+6. AMENDMENT
+   Acquirer may amend the terms of this Agreement upon written notice to Target.
+
+7. KEY EMPLOYEES
+   Target shall use reasonable efforts to retain key employees through the closing date.
+
+8. REPRESENTATIONS
+   Each party represents that it has authority to enter into this Agreement.
+
+9. EXPENSES
+   Each party shall bear its own expenses in connection with this transaction.
+
+[INTENTIONALLY MISSING CLAUSES:]
+- NO INDEMNITY CLAUSE for breaches of representations or IP infringement
+- NO FORCE MAJEURE CLAUSE for pandemics, natural disasters, or government actions
+- NO DISPUTE RESOLUTION mechanism (arbitration or litigation venue)
+- NO IP ASSIGNMENT or license terms specified
+- NO CONFIDENTIALITY provisions
+- NO NON-COMPETE restrictions for Target's founders
